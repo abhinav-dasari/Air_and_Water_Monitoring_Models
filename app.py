@@ -168,6 +168,9 @@ with tab2:
 
     water_models, water_scaler = load_water_models()
 
+    # DEBUG: Show expected scaler columns
+    st.write("Scaler expects:", water_scaler.feature_names_in_)
+
     st.sidebar.header("🧪 Enter Water Sample Values")
 
     def water_input():
@@ -175,8 +178,8 @@ with tab2:
         hardness = st.sidebar.number_input("Hardness", 0.0, 5000.0, 150.0)
         solids = st.sidebar.number_input("Solids", 0.0, 50000.0, 10000.0)
         conductivity = st.sidebar.number_input("Conductivity", 0.0, 2000.0, 400.0)
-        carbon = st.sidebar.number_input("Organic Carbon", 0.0, 50.0, 10.0)
-        thm = st.sidebar.number_input("Trihalomethanes", 0.0, 200.0, 50.0)
+        organic_carbon = st.sidebar.number_input("Organic_carbon", 0.0, 50.0, 10.0)
+        trihalomethanes = st.sidebar.number_input("Trihalomethanes", 0.0, 200.0, 50.0)
         turbidity = st.sidebar.number_input("Turbidity", 0.0, 10.0, 3.0)
 
         return pd.DataFrame([{
@@ -184,12 +187,16 @@ with tab2:
             "Hardness": hardness,
             "Solids": solids,
             "Conductivity": conductivity,
-            "Organic_carbon": carbon,
-            "Trihalomethanes": thm,
+            "Organic_carbon": organic_carbon,
+            "Trihalomethanes": trihalomethanes,
             "Turbidity": turbidity
         }])
 
     water_df = water_input()
+
+    # Ensure correct column order
+    water_df = water_df[water_scaler.feature_names_in_]
+
     water_scaled = water_scaler.transform(water_df)
 
     st.subheader("🔍 Water Safety Prediction")
@@ -206,7 +213,6 @@ with tab2:
         st.write(results_df)
 
         best_model = results_df["Probability(Safe)"].idxmax()
-
         st.success(f"🏆 Best Model: **{best_model}**")
 
         if results_df.loc[best_model, "Prediction"] == 1:
