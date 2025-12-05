@@ -144,8 +144,11 @@ with tab1:
 # ============================================================
 # ---------------- TAB 2: WATER QUALITY PREDICTION -----------
 # ============================================================
+# ============================================================
+# ---------------- TAB 2: WATER QUALITY PREDICTION -----------
+# ============================================================
 with tab2:
-    st.header("💧 Water Potability Prediction Dashboard")
+    st.header("💧 Water Contamination Prediction Dashboard (20-Feature Model)")
 
     @st.cache_resource
     def load_water_models():
@@ -168,36 +171,88 @@ with tab2:
 
     water_models, water_scaler = load_water_models()
 
-    # DEBUG: Show expected scaler columns
-    st.write("Scaler expects:", water_scaler.feature_names_in_)
+    expected_cols = list(water_scaler.feature_names_in_)
+
+    # Example / Sample values
+    example_sample = {
+        "aluminium": 0.5,
+        "ammonia": 0.1,
+        "arsenic": 0.002,
+        "barium": 1.2,
+        "cadmium": 0.0005,
+        "chloramine": 2.5,
+        "chromium": 0.01,
+        "copper": 0.5,
+        "flouride": 0.8,
+        "bacteria": 0.0,
+        "viruses": 0.0,
+        "lead": 0.003,
+        "nitrates": 5.0,
+        "nitrites": 0.5,
+        "mercury": 0.0002,
+        "perchlorate": 4.0,
+        "radium": 1.0,
+        "selenium": 0.01,
+        "silver": 0.05,
+        "uranium": 1.0
+    }
 
     st.sidebar.header("🧪 Enter Water Sample Values")
 
+    # Load sample button
+    if st.sidebar.button("🧪 Load Example Sample"):
+        st.session_state.water_inputs = example_sample.copy()
+    else:
+        if "water_inputs" not in st.session_state:
+            st.session_state.water_inputs = example_sample.copy()
+
+    # Group inputs into categories
+    metal_elements = [
+        "aluminium","arsenic","barium","cadmium","chromium",
+        "copper","lead","mercury","selenium","silver","uranium"
+    ]
+    chemical_contaminants = [
+        "ammonia","chloramine","flouride","nitrates","nitrites","perchlorate"
+    ]
+    biological = ["bacteria","viruses"]
+    radiological = ["radium"]
+
     def water_input():
-        ph = st.sidebar.number_input("pH", 0.0, 14.0, 7.0)
-        hardness = st.sidebar.number_input("Hardness", 0.0, 5000.0, 150.0)
-        solids = st.sidebar.number_input("Solids", 0.0, 50000.0, 10000.0)
-        conductivity = st.sidebar.number_input("Conductivity", 0.0, 2000.0, 400.0)
-        organic_carbon = st.sidebar.number_input("Organic_carbon", 0.0, 50.0, 10.0)
-        trihalomethanes = st.sidebar.number_input("Trihalomethanes", 0.0, 200.0, 50.0)
-        turbidity = st.sidebar.number_input("Turbidity", 0.0, 10.0, 3.0)
+        inputs = {}
 
-        return pd.DataFrame([{
-            "ph": ph,
-            "Hardness": hardness,
-            "Solids": solids,
-            "Conductivity": conductivity,
-            "Organic_carbon": organic_carbon,
-            "Trihalomethanes": trihalomethanes,
-            "Turbidity": turbidity
-        }])
+        st.subheader("🧲 Metals & Heavy Elements")
+        for col in metal_elements:
+            inputs[col] = st.number_input(col, min_value=0.0, max_value=9999.0,
+                                          value=float(st.session_state.water_inputs[col]))
 
+        st.subheader("🧪 Chemical Contaminants")
+        for col in chemical_contaminants:
+            inputs[col] = st.number_input(col, min_value=0.0, max_value=9999.0,
+                                          value=float(st.session_state.water_inputs[col]))
+
+        st.subheader("🧬 Biological Contaminants")
+        for col in biological:
+            inputs[col] = st.number_input(col, min_value=0.0, max_value=1000.0,
+                                          value=float(st.session_state.water_inputs[col]))
+
+        st.subheader("☢ Radiological Contaminants")
+        for col in radiological:
+            inputs[col] = st.number_input(col, min_value=0.0, max_value=9999.0,
+                                          value=float(st.session_state.water_inputs[col]))
+
+        return pd.DataFrame([inputs])
+
+    # Get input from UI
     water_df = water_input()
 
-    # Ensure correct column order
-    water_df = water_df[water_scaler.feature_names_in_]
+    # Fix column order to match scaler
+    water_df = water_df[expected_cols]
 
-    water_scaled = water_scaler.transform(water_df)
+    try:
+        water_scaled = water_scaler.transform(water_df)
+    except Exception as e:
+        st.error("Scaler transform failed! Column mismatch. Please verify input feature names.")
+        st.stop()
 
     st.subheader("🔍 Water Safety Prediction")
 
@@ -207,13 +262,14 @@ with tab2:
         for name, model in water_models.items():
             pred = model.predict(water_scaled)[0]
             prob = model.predict_proba(water_scaled)[0][1]
-            results[name] = {"Prediction": pred, "Probability(Safe)": prob}
+            results[name] = {"Prediction": int(pred), "Probability(Safe)": prob}
 
         results_df = pd.DataFrame(results).T
         st.write(results_df)
 
         best_model = results_df["Probability(Safe)"].idxmax()
-        st.success(f"🏆 Best Model: **{best_model}**")
+
+        st.success(f"🏆 Best Model Suggests: **{best_model}**")
 
         if results_df.loc[best_model, "Prediction"] == 1:
             st.markdown("### ✔ Water is **SAFE** to drink")
